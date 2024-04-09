@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "types/types.proto";
+
+option go_package = "./downloader;downloader";
+
+package downloader;
+
+service Downloader {
+  // Erigon "download once" - means restart/upgrade/downgrade will not download files (and will be fast)
+  // After "download once" - Erigon will produce and seed new files
+  // Downloader will able: seed new files (already existing on FS), download uncomplete parts of existing files (if Verify found some bad parts)
+  rpc ProhibitNewDownloads (ProhibitNewDownloadsRequest) returns (google.protobuf.Empty) {}
+
+  // Adding new file to downloader: non-existing files it will download, existing - seed
+  rpc Add (AddRequest) returns (google.protobuf.Empty) {}
+  rpc Delete (DeleteRequest) returns (google.protobuf.Empty) {}
+
+  // Trigger verification of files
+  // If some part of file is bad - such part will be re-downloaded (without returning error)
+  rpc Verify (VerifyRequest) returns (google.protobuf.Empty) {}
+  rpc Stats (StatsRequest) returns (StatsReply) {}
+}
+
+// DownloadItem:
+// - if Erigon created new snapshot and want seed it
+// - if Erigon wnat download files - it fills only "torrent_hash" field
+message AddItem {
+  string path = 1;
+  types.H160 torrent_hash = 2; // will be resolved as magnet link
+}
+message AddRequest {
+  repeated AddItem items = 1; // single hash will be resolved as magnet link
+}
+
+// DeleteRequest: stop seeding, delete file, delete .torrent
+message DeleteRequest {
+  repeated string paths = 1;
+}
+
+message VerifyRequest {
+}
+
+
+message StatsRequest {
+}
+
+message ProhibitNewDownloadsRequest {
+  string type = 1;
+}
+
+message StatsReply {
+  // First step on startup - "resolve metadata":
+  //   - understand total amount of data to download
+  //   - ensure all pieces hashes available
+  //   - validate files after crush
+  //   - when all metadata ready - can start download/upload
+  int32 metadata_ready = 1;
+  int32 files_total = 2;
+
+  int32 peers_unique = 4;
+  uint64 connections_total = 5;
+
+  bool completed = 6;
+  float progress = 7;
+
+  uint64 bytes_completed = 8;
+  uint64 bytes_total = 9;
+  uint64 upload_rate = 10; // bytes/sec
+  uint64 download_rate = 11; // bytes/sec
+}
